@@ -368,7 +368,18 @@ const Editor = () => {
                         {(viewMode === 'preview' || viewMode === 'split') && (
                             <div className="flex-1 h-full overflow-auto bg-gray-50 p-8 prose prose-indigo max-w-none">
                                 <h1 className="mb-8">{frontmatter.title || 'Untitled'}</h1>
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        img: ({ src, alt }) => {
+                                            // Prepend API_URL for local paths
+                                            const imgSrc = src?.startsWith('/media/') || src?.startsWith('/images/')
+                                                ? `${API_URL}${src}`
+                                                : src;
+                                            return <img src={imgSrc} alt={alt || ''} className="max-w-full rounded" />;
+                                        }
+                                    }}
+                                >
                                     {content}
                                 </ReactMarkdown>
                             </div>

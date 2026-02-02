@@ -53,10 +53,16 @@ const Sidebar = () => {
         setPublishResult(null);
 
         try {
-            const res = await axios.post(`${API_URL}/api/git/publish`, {
+            // Use media/publish to sync images to Cloudinary and rewrite URLs before committing
+            const res = await axios.post(`${API_URL}/api/media/publish`, {
                 message: `Content update ${new Date().toLocaleDateString()}`
             });
-            setPublishResult({ success: true, message: res.data.message });
+            const resultMsg = res.data.gitResult === 'success'
+                ? `Published! (${res.data.syncResults?.uploaded || 0} images uploaded)`
+                : res.data.gitResult === 'no-changes'
+                    ? 'No changes to publish'
+                    : res.data.error || 'Published';
+            setPublishResult({ success: res.data.gitResult !== 'error', message: resultMsg });
             // Refresh status
             const statusRes = await axios.get(`${API_URL}/api/git/status`);
             setGitStatus(statusRes.data);

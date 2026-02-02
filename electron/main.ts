@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ConfigStore } from './config-store';
@@ -32,7 +32,8 @@ async function createWindow() {
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      spellcheck: true
     }
   });
 
@@ -61,6 +62,81 @@ async function createWindow() {
   // Log any load errors
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
     console.error('Failed to load:', errorCode, errorDescription);
+  });
+
+  // Set spell check language
+  mainWindow.webContents.session.setSpellCheckerLanguages(['en-GB', 'en-US']);
+
+  // Enable right-click context menu
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const menuItems: Electron.MenuItemConstructorOptions[] = [];
+
+    // Add spell check suggestions for misspelled words
+    if (params.misspelledWord) {
+      console.log('Misspelled word:', params.misspelledWord);
+      console.log('Suggestions:', params.dictionarySuggestions);
+
+      if (params.dictionarySuggestions.length > 0) {
+        for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+          menuItems.push({
+            label: suggestion,
+            click: () => mainWindow?.webContents.replaceMisspelling(suggestion)
+          });
+        }
+        menuItems.push({ type: 'separator' });
+      } else {
+        menuItems.push({ label: '(No suggestions)', enabled: false });
+        menuItems.push({ type: 'separator' });
+      }
+      menuItems.push({
+        label: 'Add to Dictionary',
+        click: () => mainWindow?.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+      });
+      menuItems.push({ type: 'separator' });
+    }
+
+    // Add text editing options when there's editable text
+    if (params.isEditable) {
+      menuItems.push(
+        { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
+        { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
+        { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
+        { label: 'Select All', role: 'selectAll' }
+      );
+    } else if (params.selectionText) {
+      // Text is selected but not editable
+      menuItems.push(
+        { label: 'Copy', role: 'copy' }
+      );
+    }
+
+    // Add link options
+    if (params.linkURL) {
+      if (menuItems.length > 0) menuItems.push({ type: 'separator' });
+      menuItems.push(
+        { label: 'Copy Link', click: () => require('electron').clipboard.writeText(params.linkURL) }
+      );
+    }
+
+    // Add image options
+    if (params.mediaType === 'image') {
+      if (menuItems.length > 0) menuItems.push({ type: 'separator' });
+      menuItems.push(
+        { label: 'Copy Image URL', click: () => require('electron').clipboard.writeText(params.srcURL) }
+      );
+    }
+
+    // Add inspect element in dev mode
+    if (isDev) {
+      if (menuItems.length > 0) menuItems.push({ type: 'separator' });
+      menuItems.push(
+        { label: 'Inspect Element', click: () => mainWindow?.webContents.inspectElement(params.x, params.y) }
+      );
+    }
+
+    if (menuItems.length > 0) {
+      Menu.buildFromTemplate(menuItems).popup();
+    }
   });
 }
 
@@ -154,6 +230,40 @@ ipcMain.on('set-title', (_event, title: string) => {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  // Create application menu
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'File',
+      submenu: [
+        { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { label: 'Undo', role: 'undo' },
+        { label: 'Redo', role: 'redo' },
+        { type: 'separator' },
+        { label: 'Cut', role: 'cut' },
+        { label: 'Copy', role: 'copy' },
+        { label: 'Paste', role: 'paste' },
+        { label: 'Select All', role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Reload', role: 'reload' },
+        { label: 'Toggle DevTools', role: 'toggleDevTools' },
+        { type: 'separator' },
+        { label: 'Zoom In', role: 'zoomIn' },
+        { label: 'Zoom Out', role: 'zoomOut' },
+        { label: 'Reset Zoom', role: 'resetZoom' }
+      ]
+    }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+
   const isConfigured = configStore.getConfig().sitePath && configStore.getConfig().mediaPath;
 
   if (isConfigured) {
