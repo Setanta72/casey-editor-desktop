@@ -28,6 +28,63 @@ export async function createServer(config: ServerConfig): Promise<Express> {
     res.send('Casey Editor API is running');
   });
 
+  // GET /api/debug - Diagnostic endpoint to check configuration
+  app.get('/api/debug', async (_req, res) => {
+    const checks: Record<string, any> = {
+      config: {
+        sitePath: SITE_ROOT,
+        mediaPath: MEDIA_LIBRARY,
+        contentRoot: CONTENT_ROOT
+      },
+      paths: {
+        siteExists: fs.existsSync(SITE_ROOT),
+        contentExists: fs.existsSync(CONTENT_ROOT),
+        mediaExists: fs.existsSync(MEDIA_LIBRARY),
+        gitDirExists: fs.existsSync(path.join(SITE_ROOT, '.git'))
+      },
+      git: {}
+    };
+
+    // Test git commands
+    try {
+      const { stdout: statusOut } = await execAsync('git status --porcelain', { cwd: SITE_ROOT });
+      checks.git.status = { success: true, changes: statusOut.trim().split('\n').filter(l => l.trim()).length };
+    } catch (err: any) {
+      checks.git.status = { success: false, error: err.message };
+    }
+
+    try {
+      const { stdout: branchOut } = await execAsync('git branch --show-current', { cwd: SITE_ROOT });
+      checks.git.branch = { success: true, branch: branchOut.trim() };
+    } catch (err: any) {
+      checks.git.branch = { success: false, error: err.message };
+    }
+
+    try {
+      const { stdout: remoteOut } = await execAsync('git remote -v', { cwd: SITE_ROOT });
+      checks.git.remotes = { success: true, output: remoteOut.trim() };
+    } catch (err: any) {
+      checks.git.remotes = { success: false, error: err.message };
+    }
+
+    try {
+      const { stdout: upstreamOut } = await execAsync('git rev-parse --abbrev-ref @{u}', { cwd: SITE_ROOT });
+      checks.git.upstream = { success: true, upstream: upstreamOut.trim() };
+    } catch (err: any) {
+      checks.git.upstream = { success: false, error: err.message };
+    }
+
+    try {
+      const { stdout: aheadOut } = await execAsync('git rev-list --count @{u}..HEAD', { cwd: SITE_ROOT });
+      const { stdout: behindOut } = await execAsync('git rev-list --count HEAD..@{u}', { cwd: SITE_ROOT });
+      checks.git.sync = { success: true, ahead: parseInt(aheadOut.trim()) || 0, behind: parseInt(behindOut.trim()) || 0 };
+    } catch (err: any) {
+      checks.git.sync = { success: false, error: err.message };
+    }
+
+    res.json(checks);
+  });
+
   // Serve static images from the site's public directory
   app.use('/images', express.static(path.join(PUBLIC_ROOT, 'images')));
 
