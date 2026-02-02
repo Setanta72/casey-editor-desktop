@@ -297,16 +297,40 @@ export function createSyncModule(config: ServerConfig) {
 
     try {
       await execAsync('git add -A', { cwd: SITE_ROOT });
-      await execAsync(`git commit -m "${commitMsg}"`, { cwd: SITE_ROOT });
-      await execAsync('git push', { cwd: SITE_ROOT });
-      console.log('  Pushed to GitHub!\n');
-      console.log('=== Published successfully! ===');
-      return { syncResults, rewriteResults, gitResult: 'success' };
-    } catch (err: any) {
-      if (err.message.includes('nothing to commit')) {
-        console.log('  No changes to commit.\n');
-        return { syncResults, rewriteResults, gitResult: 'no-changes' };
+
+      // Try to commit, but don't fail if there's nothing to commit
+      let hasNewCommit = false;
+      try {
+        await execAsync(`git commit -m "${commitMsg}"`, { cwd: SITE_ROOT });
+        hasNewCommit = true;
+        console.log('  Created new commit.');
+      } catch (commitErr: any) {
+        if (commitErr.message.includes('nothing to commit')) {
+          console.log('  No new changes to commit.');
+        } else {
+          throw commitErr;
+        }
       }
+
+      // Always try to push (there may be existing unpushed commits)
+      try {
+        const { stdout: aheadOut } = await execAsync('git rev-list --count @{u}..HEAD', { cwd: SITE_ROOT });
+        const ahead = parseInt(aheadOut.trim()) || 0;
+
+        if (ahead > 0 || hasNewCommit) {
+          await execAsync('git push', { cwd: SITE_ROOT });
+          console.log(`  Pushed ${ahead + (hasNewCommit ? 1 : 0)} commit(s) to GitHub!\n`);
+          console.log('=== Published successfully! ===');
+          return { syncResults, rewriteResults, gitResult: 'success' };
+        } else {
+          console.log('  Nothing to push.\n');
+          return { syncResults, rewriteResults, gitResult: 'no-changes' };
+        }
+      } catch (pushErr: any) {
+        console.error('  Push error:', pushErr.message);
+        return { syncResults, rewriteResults, gitResult: 'error', error: pushErr.message };
+      }
+    } catch (err: any) {
       console.error('  Git error:', err.message);
       return { syncResults, rewriteResults, gitResult: 'error', error: err.message };
     }
