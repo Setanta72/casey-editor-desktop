@@ -120,6 +120,8 @@ const Editor = () => {
             if (isNew) {
                 navigate(`/${type}/${finalFilename}`, { replace: true });
             }
+            // Trigger git status refresh in sidebar
+            window.dispatchEvent(new CustomEvent('content-saved'));
         } catch (err: any) {
             console.error(err);
             alert('Failed to save: ' + err.message);

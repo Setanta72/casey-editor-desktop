@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Book, Camera, Layers, FileText, Home, Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { Book, Camera, Layers, FileText, Home, Upload, CheckCircle, AlertCircle, Download, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -10,6 +10,7 @@ interface GitStatus {
     changes: number;
     branch: string;
     ahead: number;
+    behind: number;
 }
 
 const Sidebar = () => {
@@ -17,6 +18,7 @@ const Sidebar = () => {
     const path = location.pathname.split('/')[1];
     const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
     const [publishing, setPublishing] = useState(false);
+    const [pulling, setPulling] = useState(false);
     const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const navItems = [
@@ -27,20 +29,57 @@ const Sidebar = () => {
     ];
 
     // Fetch git status periodically
+    const fetchStatus = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/git/status`);
+            setGitStatus(res.data);
+        } catch (err) {
+            console.error('Failed to fetch git status:', err);
+        }
+    };
+
     useEffect(() => {
-        const fetchStatus = async () => {
+        // On mount, do a git fetch to check for remote changes
+        const initialSync = async () => {
             try {
-                const res = await axios.get(`${API_URL}/api/git/status`);
-                setGitStatus(res.data);
+                await axios.post(`${API_URL}/api/git/fetch`);
             } catch (err) {
-                console.error('Failed to fetch git status:', err);
+                console.error('Failed to fetch from remote:', err);
             }
+            fetchStatus();
         };
 
-        fetchStatus();
+        // Listen for content-saved events to refresh status immediately
+        const handleContentSaved = () => {
+            fetchStatus();
+        };
+        window.addEventListener('content-saved', handleContentSaved);
+
+        initialSync();
         const interval = setInterval(fetchStatus, 10000); // Every 10 seconds
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('content-saved', handleContentSaved);
+        };
     }, []);
+
+    // Pull latest changes from remote
+    const handlePull = async () => {
+        setPulling(true);
+        try {
+            const res = await axios.post(`${API_URL}/api/git/pull`);
+            setPublishResult({ success: true, message: res.data.message });
+            // Refresh status after pull
+            await fetchStatus();
+            // Reload page to get fresh content
+            window.location.reload();
+        } catch (err: any) {
+            setPublishResult({ success: false, message: err.response?.data?.error || 'Pull failed' });
+        } finally {
+            setPulling(false);
+            setTimeout(() => setPublishResult(null), 5000);
+        }
+    };
 
     const handlePublish = async () => {
         if (!gitStatus?.hasChanges && !gitStatus?.ahead) {
@@ -110,14 +149,40 @@ const Sidebar = () => {
                 {gitStatus && (
                     <div className="mb-3 text-xs text-gray-500">
                         <div className="flex items-center justify-between">
-                            <span>Branch: {gitStatus.branch || 'main'}</span>
+                            <span className="flex items-center gap-2">
+                                Branch: {gitStatus.branch || 'main'}
+                                <button
+                                    onClick={fetchStatus}
+                                    className="p-1 hover:bg-gray-800 rounded"
+                                    title="Refresh status"
+                                >
+                                    <RefreshCw size={12} />
+                                </button>
+                            </span>
                             {gitStatus.hasChanges && (
                                 <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
                                     {gitStatus.changes} changes
                                 </span>
                             )}
                         </div>
+                        {gitStatus.behind > 0 && (
+                            <div className="mt-2 bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">
+                                ⚠️ {gitStatus.behind} commit{gitStatus.behind > 1 ? 's' : ''} behind remote
+                            </div>
+                        )}
                     </div>
+                )}
+
+                {/* Pull button - show prominently when behind */}
+                {gitStatus?.behind > 0 && (
+                    <button
+                        onClick={handlePull}
+                        disabled={pulling}
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors mb-2 bg-blue-600 hover:bg-blue-700 text-white ${pulling ? 'opacity-50 cursor-wait' : ''}`}
+                    >
+                        <Download size={18} />
+                        {pulling ? 'Pulling...' : 'Pull Latest Changes'}
+                    </button>
                 )}
 
                 <button

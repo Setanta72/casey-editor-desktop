@@ -195,9 +195,12 @@ export async function createServer(config: ServerConfig): Promise<Express> {
       const branch = branchOut.trim();
 
       let ahead = 0;
+      let behind = 0;
       try {
         const { stdout: aheadOut } = await execAsync('git rev-list --count @{u}..HEAD', { cwd: SITE_ROOT });
         ahead = parseInt(aheadOut.trim()) || 0;
+        const { stdout: behindOut } = await execAsync('git rev-list --count HEAD..@{u}', { cwd: SITE_ROOT });
+        behind = parseInt(behindOut.trim()) || 0;
       } catch {
         // No upstream set
       }
@@ -207,8 +210,44 @@ export async function createServer(config: ServerConfig): Promise<Express> {
         changes: changes.length,
         changesList: changes.slice(0, 20),
         branch,
-        ahead
+        ahead,
+        behind
       });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/git/pull - Pull latest changes from remote
+  app.post('/api/git/pull', async (_req, res) => {
+    try {
+      // First fetch to update remote tracking
+      await execAsync('git fetch', { cwd: SITE_ROOT });
+      // Then pull
+      const { stdout } = await execAsync('git pull --ff-only', { cwd: SITE_ROOT });
+      res.json({ success: true, message: stdout.trim() || 'Already up to date' });
+    } catch (err: any) {
+      if (err.message.includes('Already up to date')) {
+        res.json({ success: true, message: 'Already up to date' });
+      } else {
+        res.status(500).json({ error: err.message });
+      }
+    }
+  });
+
+  // POST /api/git/fetch - Fetch from remote (to check for updates without pulling)
+  app.post('/api/git/fetch', async (_req, res) => {
+    try {
+      await execAsync('git fetch', { cwd: SITE_ROOT });
+      // Get behind count after fetch
+      let behind = 0;
+      try {
+        const { stdout: behindOut } = await execAsync('git rev-list --count HEAD..@{u}', { cwd: SITE_ROOT });
+        behind = parseInt(behindOut.trim()) || 0;
+      } catch {
+        // No upstream set
+      }
+      res.json({ success: true, behind });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
