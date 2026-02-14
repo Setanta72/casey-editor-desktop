@@ -174,7 +174,7 @@ const Sidebar = () => {
                 )}
 
                 {/* Pull button - show prominently when behind */}
-                {gitStatus?.behind > 0 && (
+                {(gitStatus?.behind ?? 0) > 0 && (
                     <button
                         onClick={handlePull}
                         disabled={pulling}
