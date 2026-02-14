@@ -2,9 +2,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, ArrowLeft, Camera, Eye, Edit3, Image as ImageIcon, Link as LinkIcon, Bold, Italic, List, Layers, Circle } from 'lucide-react';
+import { Save, ArrowLeft, Camera, Eye, Edit3, Image as ImageIcon, Link as LinkIcon, Bold, Italic, List, Layers, Circle, Play } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { API_URL, CATEGORIES, PROJECT_STATUSES } from '../config';
 
 const Editor = () => {
@@ -153,9 +154,15 @@ const Editor = () => {
         }, 0);
     };
 
+    const isVideoFile = (path: string) => /\.(mp4|webm|mov)$/i.test(path);
+
     const handleImageInsert = (imgPath: string) => {
         if (showImagePicker === 'editor') {
-            insertText(`![Image](${imgPath})`);
+            if (isVideoFile(imgPath)) {
+                insertText(`<video src="${imgPath}" controls></video>`);
+            } else {
+                insertText(`![Image](${imgPath})`);
+            }
         } else if (typeof showImagePicker === 'string') {
             updateFm(showImagePicker, imgPath);
         }
@@ -372,6 +379,7 @@ const Editor = () => {
                                 <h1 className="mb-8">{frontmatter.title || 'Untitled'}</h1>
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeRaw]}
                                     components={{
                                         img: ({ src, alt }) => {
                                             // Prepend API_URL for local paths
@@ -379,6 +387,13 @@ const Editor = () => {
                                                 ? `${API_URL}${src}`
                                                 : src;
                                             return <img src={imgSrc} alt={alt || ''} className="max-w-full rounded" />;
+                                        },
+                                        video: ({ src, ...props }) => {
+                                            // Prepend API_URL for local paths
+                                            const videoSrc = src?.startsWith('/media/') || src?.startsWith('/images/')
+                                                ? `${API_URL}${src}`
+                                                : src;
+                                            return <video src={videoSrc} controls className="max-w-full rounded" {...props} />;
                                         }
                                     }}
                                 >
@@ -424,7 +439,7 @@ const Editor = () => {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                         <header className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <div className="flex items-center gap-4">
-                                <h3 className="font-bold text-gray-700">Select Image</h3>
+                                <h3 className="font-bold text-gray-700">Select Media</h3>
                                 <div className="flex bg-gray-200 rounded-lg p-1">
                                     <button
                                         onClick={() => setImageSource('library')}
@@ -457,9 +472,18 @@ const Editor = () => {
                                                 className="group relative aspect-square bg-gray-200 rounded-lg overflow-hidden cursor-pointer border-2 border-transparent hover:border-indigo-500 transition-all"
                                                 onClick={() => handleImageInsert(img.path)}
                                             >
-                                                <img src={`${API_URL}${img.path}`} alt={img.name} className="w-full h-full object-cover" onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23ddd" width="100" height="100"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="12">No preview</text></svg>';
-                                                }} />
+                                                {isVideoFile(img.path) ? (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                                        <Play size={40} className="text-white/80" />
+                                                    </div>
+                                                ) : (
+                                                    <img src={`${API_URL}${img.path}`} alt={img.name} className="w-full h-full object-cover" onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23ddd" width="100" height="100"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="12">No preview</text></svg>';
+                                                    }} />
+                                                )}
+                                                {isVideoFile(img.path) && (
+                                                    <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">VIDEO</div>
+                                                )}
                                                 <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <p className="text-white text-[10px] truncate">{img.name}</p>
                                                     <p className="text-white/70 text-[9px]">{img.category}</p>

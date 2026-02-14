@@ -72,15 +72,23 @@ export function createSyncModule(config: ServerConfig) {
     return crypto.createHash('md5').update(content).digest('hex');
   }
 
-  function findImageReferences(): string[] {
-    const images = new Set<string>();
+  const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov'];
+
+  function isVideoFile(filePath: string): boolean {
+    const ext = path.extname(filePath).toLowerCase();
+    return VIDEO_EXTENSIONS.includes(ext);
+  }
+
+  function findMediaReferences(): string[] {
+    const media = new Set<string>();
     const contentTypes = ['posts', 'projects', 'pieces', 'notes'];
 
     const patterns = [
-      /!\[.*?\]\(\/media\/([^)]+)\)/g,
-      /!\[.*?\]\(\.\.\/\.\.\/\.\.\/Media\/([^)]+)\)/g,
-      /image:\s*["']?\/media\/([^"'\s]+)/g,
-      /src=["']\/media\/([^"']+)/g
+      /!\[.*?\]\(\/media\/([^)]+)\)/g,                    // Markdown images
+      /!\[.*?\]\(\.\.\/\.\.\/\.\.\/Media\/([^)]+)\)/g,    // Relative paths
+      /image:\s*["']?\/media\/([^"'\s]+)/g,               // Frontmatter image
+      /src=["']\/media\/([^"']+)/g,                       // HTML src attribute (images and videos)
+      /<video[^>]*src=["']\/media\/([^"']+)/g             // Video tags
     ];
 
     for (const type of contentTypes) {
@@ -95,34 +103,42 @@ export function createSyncModule(config: ServerConfig) {
           let match;
           const regex = new RegExp(pattern.source, pattern.flags);
           while ((match = regex.exec(content)) !== null) {
-            images.add(match[1]);
+            media.add(match[1]);
           }
         }
       }
     }
 
-    return Array.from(images);
+    return Array.from(media);
   }
 
-  async function uploadImage(localPath: string): Promise<{ url: string; public_id: string; bytes: number } | null> {
+  async function uploadMedia(localPath: string): Promise<{ url: string; public_id: string; bytes: number } | null> {
     const fullPath = path.join(MEDIA_LIBRARY, localPath);
 
     if (!fs.existsSync(fullPath)) {
-      console.error(`Image not found: ${fullPath}`);
+      console.error(`Media not found: ${fullPath}`);
       return null;
     }
 
+    const isVideo = isVideoFile(localPath);
+
     try {
-      const result = await cloudinary.uploader.upload(fullPath, {
+      const uploadOptions: any = {
         public_id: `casey-site/${localPath.replace(/\.[^.]+$/, '')}`,
         folder: 'casey-site',
         overwrite: true,
-        resource_type: 'image',
-        transformation: [
+        resource_type: isVideo ? 'video' : 'image'
+      };
+
+      // Only apply image-specific transformations for images
+      if (!isVideo) {
+        uploadOptions.transformation = [
           { quality: 'auto:good' },
           { fetch_format: 'auto' }
-        ]
-      });
+        ];
+      }
+
+      const result = await cloudinary.uploader.upload(fullPath, uploadOptions);
 
       return {
         url: result.secure_url,
@@ -147,10 +163,10 @@ export function createSyncModule(config: ServerConfig) {
       uploads: []
     };
 
-    console.log('Scanning content for image references...');
-    const references = findImageReferences();
+    console.log('Scanning content for media references...');
+    const references = findMediaReferences();
     results.scanned = references.length;
-    console.log(`Found ${references.length} image references`);
+    console.log(`Found ${references.length} media references`);
 
     for (const ref of references) {
       const localPath = ref;
@@ -178,7 +194,7 @@ export function createSyncModule(config: ServerConfig) {
       }
 
       console.log(`  [UPLOADING] ${localPath}...`);
-      const result = await uploadImage(localPath);
+      const result = await uploadMedia(localPath);
 
       if (result) {
         cache[localPath] = {

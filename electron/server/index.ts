@@ -189,7 +189,7 @@ export async function createServer(config: ServerConfig): Promise<Express> {
           results = results.concat(getImages(fullPath, path.join(baseDir, path.basename(fullPath))));
         } else {
           const ext = path.extname(fullPath).toLowerCase();
-          if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext)) {
+          if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.mp4', '.webm', '.mov'].includes(ext)) {
             results.push(path.join('/images', baseDir, path.basename(fullPath)));
           }
         }
@@ -218,7 +218,7 @@ export async function createServer(config: ServerConfig): Promise<Express> {
 
         if (entry.isDirectory()) {
           results = results.concat(scanDir(fullPath, relativePath));
-        } else if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(entry.name)) {
+        } else if (/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov)$/i.test(entry.name)) {
           const stats = fs.statSync(fullPath);
           results.push({
             path: `/media/${relativePath}`,
