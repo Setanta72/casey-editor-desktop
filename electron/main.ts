@@ -214,6 +214,14 @@ ipcMain.handle('is-configured', () => {
   return !!(config.sitePath && config.mediaPath);
 });
 
+ipcMain.handle('validate-config', () => {
+  return configStore.validateConfig();
+});
+
+ipcMain.handle('get-config-path', () => {
+  return configStore.getConfigPath();
+});
+
 ipcMain.handle('restart-server', async () => {
   if (server) {
     server.close();

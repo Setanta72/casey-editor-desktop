@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setConfig: (config: Partial<AppConfig>): Promise<boolean> =>
     ipcRenderer.invoke('set-config', config),
   isConfigured: (): Promise<boolean> => ipcRenderer.invoke('is-configured'),
+  validateConfig: (): Promise<{ valid: boolean; errors: string[] }> =>
+    ipcRenderer.invoke('validate-config'),
+  getConfigPath: (): Promise<string> => ipcRenderer.invoke('get-config-path'),
 
   // API URL
   getApiUrl: (): Promise<string> => ipcRenderer.invoke('get-api-url'),
@@ -37,6 +40,8 @@ declare global {
       getConfig: () => Promise<AppConfig>;
       setConfig: (config: Partial<AppConfig>) => Promise<boolean>;
       isConfigured: () => Promise<boolean>;
+      validateConfig: () => Promise<{ valid: boolean; errors: string[] }>;
+      getConfigPath: () => Promise<string>;
       getApiUrl: () => Promise<string>;
       setCloudinaryCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;
       selectDirectory: () => Promise<string | null>;
