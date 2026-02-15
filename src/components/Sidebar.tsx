@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Book, Camera, Layers, FileText, Home, Upload, CheckCircle, AlertCircle, Download, RefreshCw } from 'lucide-react';
+import { Book, Camera, Layers, FileText, Home, Upload, CheckCircle, AlertCircle, Download, RefreshCw, Settings } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -117,9 +117,9 @@ const Sidebar = () => {
         <div className="w-64 bg-gray-900 text-white min-h-screen flex flex-col">
             <div className="p-6">
                 <h1 className="text-xl font-bold flex items-center gap-2">
-                    Casey Editor
+                    ProofMark
                 </h1>
-                <p className="text-xs text-gray-500 mt-1">caseyclan.ie</p>
+                <p className="text-xs text-gray-500 mt-1">Markdown Editor</p>
             </div>
             <nav className="flex-1 px-4">
                 <Link
@@ -142,6 +142,20 @@ const Sidebar = () => {
                         <span>{item.name}</span>
                     </Link>
                 ))}
+
+                <div className="mt-4 pt-4 border-t border-gray-800">
+                    <Link
+                        to="/settings"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                            path === 'settings'
+                                ? 'bg-indigo-600 text-white'
+                                : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                        }`}
+                    >
+                        <Settings size={20} />
+                        <span>Settings</span>
+                    </Link>
+                </div>
             </nav>
 
             {/* Publish Section */}

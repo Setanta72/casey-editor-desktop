@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import FileList from './components/FileList';
 import Editor from './components/Editor';
 import Setup from './components/Setup';
+import Settings from './components/Settings';
 import { isElectron } from './config';
 
 const App = () => {
@@ -45,6 +46,7 @@ const App = () => {
       <main className={`flex-1 flex flex-col ${isEditor ? 'overflow-hidden' : 'overflow-auto'}`}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/:type" element={<FileList />} />
           <Route path="/:type/:filename" element={<Editor />} />
         </Routes>
