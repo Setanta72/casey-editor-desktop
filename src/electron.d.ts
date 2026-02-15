@@ -12,6 +12,8 @@ declare global {
       getConfig: () => Promise<AppConfig>;
       setConfig: (config: Partial<AppConfig>) => Promise<boolean>;
       isConfigured: () => Promise<boolean>;
+      validateConfig: () => Promise<{ valid: boolean; errors: string[] }>;
+      getConfigPath: () => Promise<string>;
       getApiUrl: () => Promise<string>;
       setCloudinaryCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;
       selectDirectory: () => Promise<string | null>;
