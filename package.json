@@ -1,7 +1,7 @@
 {
-  "name": "casey-editor-desktop",
+  "name": "proofmark",
   "version": "1.0.0",
-  "description": "Desktop content editor for Casey website",
+  "description": "Desktop markdown editor for static site publishers",
   "type": "module",
   "main": "dist-electron/main.js",
   "author": "Setanta",
@@ -54,8 +54,8 @@
     "wait-on": "^8.0.0"
   },
   "build": {
-    "appId": "ie.caseyclan.editor",
-    "productName": "Casey Editor",
+    "appId": "ie.caseyclan.proofmark",
+    "productName": "ProofMark",
     "directories": {
       "output": "release",
       "buildResources": "build"
